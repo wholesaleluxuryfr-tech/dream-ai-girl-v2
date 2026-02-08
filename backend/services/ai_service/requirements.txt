@@ -1,0 +1,32 @@
+# FastAPI and ASGI server
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# Database
+sqlalchemy==2.0.25
+psycopg2-binary==2.9.9
+redis==5.0.1
+
+# AI/ML Libraries
+openai==1.10.0  # For OpenRouter API (compatible client)
+requests==2.31.0
+httpx==0.26.0
+
+# Image Generation (local SDXL - optional)
+# torch==2.1.2
+# diffusers==0.25.0
+# transformers==4.36.2
+# accelerate==0.25.0
+
+# Celery for async tasks
+celery[redis]==5.3.4
+kombu==5.3.4
+
+# Vector database for memory
+pinecone-client==3.0.0  # For long-term AI memory system
+
+# Utilities
+python-dotenv==1.0.0
+python-json-logger==2.0.7

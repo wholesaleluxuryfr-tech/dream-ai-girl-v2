@@ -1,0 +1,327 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: dream-ai-postgres
+    environment:
+      POSTGRES_USER: dreamai
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dreamai_dev_password}
+      POSTGRES_DB: dreamai_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dreamai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dream-ai-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: dream-ai-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-dreamai_redis_dev}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dream-ai-network
+
+  # MongoDB (for logs and analytics)
+  mongodb:
+    image: mongo:7
+    container_name: dream-ai-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: dreamai
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-dreamai_mongo_dev}
+      MONGO_INITDB_DATABASE: dreamai_analytics
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - dream-ai-network
+
+  # RabbitMQ (message queue for Celery)
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: dream-ai-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: dreamai
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-dreamai_rabbit_dev}
+    ports:
+      - "5672:5672"   # AMQP
+      - "15672:15672" # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - dream-ai-network
+
+  # API Gateway (FastAPI)
+  api-gateway:
+    build:
+      context: ./backend/services/api_gateway
+      dockerfile: Dockerfile
+    container_name: dream-ai-api-gateway
+    environment:
+      - ENVIRONMENT=development
+      - POSTGRES_URL=postgresql://dreamai:${POSTGRES_PASSWORD:-dreamai_dev_password}@postgres:5432/dreamai_db
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-dreamai_redis_dev}@redis:6379/0
+      - AUTH_SERVICE_URL=http://auth-service:8001
+      - CHAT_SERVICE_URL=http://chat-service:8002
+      - AI_SERVICE_URL=http://ai-service:8003
+      - MEDIA_SERVICE_URL=http://media-service:8004
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend/services/api_gateway:/app
+      - ./backend/shared:/app/shared
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - dream-ai-network
+
+  # Auth Service
+  auth-service:
+    build:
+      context: ./backend/services/auth_service
+      dockerfile: Dockerfile
+    container_name: dream-ai-auth-service
+    environment:
+      - POSTGRES_URL=postgresql://dreamai:${POSTGRES_PASSWORD:-dreamai_dev_password}@postgres:5432/dreamai_db
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-dreamai_redis_dev}@redis:6379/0
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-jwt-dev-secret-key}
+      - JWT_ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+      - REFRESH_TOKEN_EXPIRE_DAYS=30
+    ports:
+      - "8001:8001"
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./backend/services/auth_service:/app
+      - ./backend/shared:/app/shared
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+    networks:
+      - dream-ai-network
+
+  # Chat Service (WebSocket)
+  chat-service:
+    build:
+      context: ./backend/services/chat_service
+      dockerfile: Dockerfile
+    container_name: dream-ai-chat-service
+    environment:
+      - POSTGRES_URL=postgresql://dreamai:${POSTGRES_PASSWORD:-dreamai_dev_password}@postgres:5432/dreamai_db
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-dreamai_redis_dev}@redis:6379/0
+      - AI_SERVICE_URL=http://ai-service:8003
+    ports:
+      - "8002:8002"
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./backend/services/chat_service:/app
+      - ./backend/shared:/app/shared
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8002 --reload
+    networks:
+      - dream-ai-network
+
+  # AI Service
+  ai-service:
+    build:
+      context: ./backend/services/ai_service
+      dockerfile: Dockerfile
+    container_name: dream-ai-ai-service
+    environment:
+      - POSTGRES_URL=postgresql://dreamai:${POSTGRES_PASSWORD:-dreamai_dev_password}@postgres:5432/dreamai_db
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-dreamai_redis_dev}@redis:6379/0
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      - REPLICATE_API_TOKEN=${REPLICATE_API_TOKEN}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
+      - PINECONE_API_KEY=${PINECONE_API_KEY}
+      - PINECONE_ENVIRONMENT=${PINECONE_ENVIRONMENT:-us-west1-gcp}
+    ports:
+      - "8003:8003"
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+    volumes:
+      - ./backend/services/ai_service:/app
+      - ./backend/shared:/app/shared
+      - ai_models:/app/models  # Local AI models storage
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8003 --reload
+    networks:
+      - dream-ai-network
+
+  # Celery Worker (for async AI tasks)
+  celery-worker:
+    build:
+      context: ./backend/services/ai_service
+      dockerfile: Dockerfile
+    container_name: dream-ai-celery-worker
+    environment:
+      - POSTGRES_URL=postgresql://dreamai:${POSTGRES_PASSWORD:-dreamai_dev_password}@postgres:5432/dreamai_db
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-dreamai_redis_dev}@redis:6379/0
+      - RABBITMQ_URL=amqp://dreamai:${RABBITMQ_PASSWORD:-dreamai_rabbit_dev}@rabbitmq:5672/
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - REPLICATE_API_TOKEN=${REPLICATE_API_TOKEN}
+    depends_on:
+      - rabbitmq
+      - redis
+      - postgres
+    volumes:
+      - ./backend/services/ai_service:/app
+      - ./backend/shared:/app/shared
+      - ai_models:/app/models
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=4
+    networks:
+      - dream-ai-network
+
+  # Media Service
+  media-service:
+    build:
+      context: ./backend/services/media_service
+      dockerfile: Dockerfile
+    container_name: dream-ai-media-service
+    environment:
+      - POSTGRES_URL=postgresql://dreamai:${POSTGRES_PASSWORD:-dreamai_dev_password}@postgres:5432/dreamai_db
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-dreamai_redis_dev}@redis:6379/0
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_S3_BUCKET=${AWS_S3_BUCKET:-dream-ai-media}
+      - CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID}
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
+    ports:
+      - "8004:8004"
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./backend/services/media_service:/app
+      - ./backend/shared:/app/shared
+      - media_uploads:/app/uploads  # Temporary local storage
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8004 --reload
+    networks:
+      - dream-ai-network
+
+  # Recommendation Service
+  recommendation-service:
+    build:
+      context: ./backend/services/recommendation_service
+      dockerfile: Dockerfile
+    container_name: dream-ai-recommendation-service
+    environment:
+      - POSTGRES_URL=postgresql://dreamai:${POSTGRES_PASSWORD:-dreamai_dev_password}@postgres:5432/dreamai_db
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-dreamai_redis_dev}@redis:6379/0
+      - MONGODB_URL=mongodb://dreamai:${MONGO_PASSWORD:-dreamai_mongo_dev}@mongodb:27017/
+    ports:
+      - "8005:8005"
+    depends_on:
+      - postgres
+      - redis
+      - mongodb
+    volumes:
+      - ./backend/services/recommendation_service:/app
+      - ./backend/shared:/app/shared
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8005 --reload
+    networks:
+      - dream-ai-network
+
+  # Payment Service
+  payment-service:
+    build:
+      context: ./backend/services/payment_service
+      dockerfile: Dockerfile
+    container_name: dream-ai-payment-service
+    environment:
+      - POSTGRES_URL=postgresql://dreamai:${POSTGRES_PASSWORD:-dreamai_dev_password}@postgres:5432/dreamai_db
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-dreamai_redis_dev}@redis:6379/0
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
+    ports:
+      - "8006:8006"
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./backend/services/payment_service:/app
+      - ./backend/shared:/app/shared
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8006 --reload
+    networks:
+      - dream-ai-network
+
+  # Nginx (reverse proxy for production)
+  nginx:
+    image: nginx:alpine
+    container_name: dream-ai-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./infrastructure/nginx/ssl:/etc/nginx/ssl
+      - ./frontend/build:/usr/share/nginx/html
+    depends_on:
+      - api-gateway
+    networks:
+      - dream-ai-network
+
+  # Frontend Dev Server (Next.js)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: dream-ai-frontend
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_WS_URL=ws://localhost:8002
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    command: npm run dev
+    networks:
+      - dream-ai-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  mongodb_data:
+  rabbitmq_data:
+  ai_models:
+  media_uploads:
+
+networks:
+  dream-ai-network:
+    driver: bridge

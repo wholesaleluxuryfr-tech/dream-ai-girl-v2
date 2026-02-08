@@ -1,0 +1,101 @@
+╔════════════════════════════════════════════════════════════╗
+║                                                            ║
+║         🎯 DÉMARRAGE ULTRA-SIMPLE - DÉBUTANTS             ║
+║                                                            ║
+╚════════════════════════════════════════════════════════════╝
+
+
+📱 VOUS ÊTES SUR TERMUX? Suivez ces 3 étapes:
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ÉTAPE 1: Aller dans le bon dossier
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Copiez-collez cette commande dans Termux:
+
+cd /data/data/com.termux/files/home/downloads/dream-ai-refactored && pwd
+
+✓ Vous devriez voir le chemin du dossier s'afficher
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ÉTAPE 2: Lancer le serveur
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Copiez-collez cette commande:
+
+python3 backend/test_server.py 8000
+
+⏳ Attendez 2-3 secondes...
+
+✓ Vous verrez apparaître:
+  "🚀 Dream AI Girl - Test Server"
+  "✓ Server running on: http://localhost:8000"
+
+🎉 ÇA MARCHE! Ne fermez pas ce terminal!
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ÉTAPE 3: Tester dans un NOUVEAU terminal
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Ouvrez un NOUVEAU terminal Termux (laissez l'ancien ouvert!)
+
+Dans ce nouveau terminal, copiez:
+
+curl http://localhost:8000/health
+
+✓ Vous devriez voir du texte qui commence par:
+  {"status":"healthy"...}
+
+🎉 BRAVO! Votre serveur fonctionne!
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🌐 Voir dans le navigateur (BONUS)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Ouvrez Chrome sur votre téléphone et allez à:
+
+http://localhost:8000
+
+Vous verrez les informations de l'API!
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🛑 Pour arrêter le serveur
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Dans le terminal où le serveur tourne, appuyez sur:
+
+Ctrl + C  (ou Volume Bas + C sur Android)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📚 Pour en savoir plus
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Lisez le fichier: GUIDE_DEBUTANT.md
+
+Il explique:
+- Comment mettre votre site en ligne (gratuit!)
+- Comment installer toutes les fonctionnalités
+- Comment déployer sur un vrai serveur
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+❓ Besoin d'aide?
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Dites simplement:
+- "Je veux mettre en ligne" → Je vous aide!
+- "Ça ne marche pas" → Envoyez-moi l'erreur!
+- "C'est quoi la suite?" → Je vous explique!
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎉 FÉLICITATIONS! Vous avez déployé votre premier serveur API!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
