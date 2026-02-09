@@ -101,8 +101,13 @@ class UnifiedAPIHandler(BaseHTTPRequestHandler):
 
         # Root - Web interface
         if path == '/':
-            html = self._get_web_interface()
-            self._send_html(html)
+            try:
+                with open('index.html', 'r', encoding='utf-8') as f:
+                    html = f.read()
+                self._send_html(html)
+            except:
+                html = self._get_web_interface()
+                self._send_html(html)
 
         # API Health check
         elif path == '/health' or path == '/api/health':
