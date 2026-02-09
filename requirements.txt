@@ -1,0 +1,5 @@
+# Dream AI Girl 2.0 - Dependencies
+# Minimal dependencies for simple deployment
+
+# No external dependencies required for basic server
+# Using Python standard library only
